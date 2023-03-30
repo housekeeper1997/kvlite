@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 flask = "*"
 waitress = "*"
+sqlalchemy = "*"
+pymysql = "*"
 
 [dev-packages]
 
