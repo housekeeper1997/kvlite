@@ -26,3 +26,4 @@ htmlcov/
 
 # My test files
 *.db
+.vercel

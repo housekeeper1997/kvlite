@@ -1,10 +1,10 @@
 #! /usr/bin/env python3
 
 from flask import Flask, jsonify, request
-from src import data as db, timepoint
+from api import data as db, timepoint
 from time import time
 
-from src.utility import env_float, env_int, env_str, failed, strExceedLimit, succeed
+from api.utility import env_float, env_int, env_str, failed, strExceedLimit, succeed
 
 DB_NAME = env_str('DB_NAME','KVData.db')
 TZ_HOUR_OFFSET = env_float('TZ_HOUR_OFFSET', 8.0)    # Bejing Standard Time (UTC+08:00)
