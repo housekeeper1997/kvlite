@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 
-from flask import Flask, jsonify, request
+from flask import Flask, request, render_template, url_for
 from api import data as db, timepoint
 from time import time
-
+from datetime import datetime
 from api.utility import env_float, env_int, env_str, failed, strExceedLimit, succeed
 
 # DB_NAME = env_str('DB_NAME','KVData.db')
@@ -14,6 +14,8 @@ KEY_LENGTH_LIMIT = env_int('KEY_LENGTH_LIMIT', 64)
 VALUE_LENGTH_LIMIT = env_int('VALUE_LENGTH_LIMIT', 1024 * 8)                   # bytes
 MINIMUM_SET_INTERVAL_PER_USER = env_int('MINIMUM_SET_INTERVAL_PER_USER', 60)    # seconds
 MINIMUM_SET_INTERVAL_SYSTEM = env_int('MINIMUM_SET_INTERVAL_SYSTEM', 1)         # seconds
+PER_PAGE_DEFAULT = env_int('PER_PAGE_DEFAULT', 10)      # Rows per page
+PAGE_DEFAULT = env_int('PAGE_DEFAULT', 1)               # Page number
 
 KKEY = 'key'
 VKEY = 'value'
@@ -34,30 +36,17 @@ def get_engine():
 
 @app.route('/')
 def hello():
-    return '''<html>
-            <body style="background-color:#f7f7f7;color:#555;font-family: Söhne,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif,Helvetica Neue,Arial,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;">
-            <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-left:-5em;">
-                <div style="margin:.8em;margin-top:-3em;font-size:2rem;text-align:center;">
-                    <p style="margin:auto;"><strong>KVLite</strong></p>
-                    <p style="margin:auto;margin-top:.3em;padding-left:12em;font-size:.65em;">-- A key-value storage service.</p>
-                </div>
-                <div style="margin:0;font-size:1.3em;">
-                    Created with:
-                    <ul style="margin:auto;">
-                        <li><code>python</code></li>
-                        <li><code>Flask</code></li>
-                        <li><code>SQLAlchemy</code></li>
-                    </ul>
-                </div>
-            </div>
-            </body>
-            </html>\n'''
+    return render_template('index.html')
 
 @app.route('/kv')
 def get_data():
-    rows = db.selectAll(get_engine())
-    rows = [{KKEY: r[0],VKEY: r[1],TKEY: r[2]} for r in rows]
-    return jsonify(rows)
+    page = request.args.get('page', PAGE_DEFAULT, type=int)
+    per_page = request.args.get('per_page', PER_PAGE_DEFAULT, type=int)
+    records = db.selectAll(get_engine(), page, per_page)
+    rows = [{"id": r.id,KKEY: r.key,VKEY: r.value,TKEY: datetime.fromtimestamp(int(float(r.update)))} for r in records]
+    prev_page_url = url_for('get_data', page=page-1, per_page=per_page) if page > 1 else None
+    next_page_url = url_for('get_data', page=page+1, per_page=per_page) if len(records) == per_page else None
+    return render_template('kv.html', kv_list=rows, prev_page_url=prev_page_url, next_page_url=next_page_url)
 
 @app.route('/kv/<key>')
 def get_kv(key):

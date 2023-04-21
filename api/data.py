@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 
 import unittest
-import os
 import sqlalchemy as db
 from sqlalchemy import Column, String, Integer
+from sqlalchemy.orm import Session, declarative_base
 from api.utility import env_str, env_int
 
 KVTABLE_NAME = env_str('KVTABLE_NAME','BanData')
@@ -14,6 +14,15 @@ UPDATE_COLUMN_LENGTH = env_int('UPDATE_COLUMN_LENGTH', 256)
 KCOLNAME = f'{COLUMN_PREFIX}_key'
 VCOLNAME = f'{COLUMN_PREFIX}_value'
 UCOLNAME = f'{COLUMN_PREFIX}_update'
+
+Base = declarative_base()
+
+class Kv(Base):
+    __tablename__ = KVTABLE_NAME
+    id = Column(Integer, primary_key=True, name='rowid')
+    key = Column(String(KEY_COLUMN_LENGTH), nullable=False, name=KCOLNAME)
+    value = Column(String(VALUE_COLUMN_LENGTH), nullable=False, name=VCOLNAME)
+    update = Column(String(UPDATE_COLUMN_LENGTH), nullable=False, name=UCOLNAME)
 
 def connect_db(dbname, clean=False):
     # conn = sqlite3.connect(dbname)
@@ -42,14 +51,11 @@ def connect_db(dbname, clean=False):
         return engine
 
 def insert(engine, k, v, now, tn=KVTABLE_NAME, kcn=KCOLNAME, vcn=VCOLNAME, ucn=UCOLNAME):
-    stmt = f"INSERT INTO {tn}({kcn},{vcn},{ucn}) values(:k, :v, :now)"
-    values = {'v': v,'now': now,'k': k}
-    with engine.begin() as conn:
-        conn.execute(db.text(stmt), values)
-        # conn.commit()
-        meta = db.MetaData()
-        result = conn.execute(db.text("SELECT LAST_INSERT_ID()"))
-        lastrowid = result.fetchone()[0]
+    record = Kv(key=k, value=v, update=now)
+    with Session(engine) as session:
+        session.add(record)
+        session.commit()
+        lastrowid = record.id
         return lastrowid != 0, lastrowid
 
 def update(engine, k, v, now, tn=KVTABLE_NAME, kcn=KCOLNAME, vcn=VCOLNAME, ucn=UCOLNAME):
@@ -69,12 +75,9 @@ def select(engine, k, tn=KVTABLE_NAME, kcn=KCOLNAME, vcn=VCOLNAME, ucn=UCOLNAME)
             return None
         return row
 
-def selectAll(engine, tn=KVTABLE_NAME, kcn=KCOLNAME, vcn=VCOLNAME, ucn=UCOLNAME):
-    metadata = db.MetaData()
-    stmt = f"select {kcn}, {vcn}, {ucn} from {tn}"
-    with engine.connect() as conn:
-        result = conn.execute(db.text(stmt))
-        return result
+def selectAll(engine, page=1, per_page=10):
+    with Session(engine) as session:
+        return session.query(Kv).offset((page-1)*per_page).limit(per_page).all()
 
 def rowCount(engine, tn=KVTABLE_NAME):
     stmt = f"select count(rowid) from {tn}"
