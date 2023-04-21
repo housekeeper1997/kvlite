@@ -21,7 +21,7 @@ KKEY = 'key'
 VKEY = 'value'
 TKEY = "time"
 
-LastWriteTime = timepoint.timepoint()
+LastWriteTime = timepoint.timepoint(time()+MINIMUM_SET_INTERVAL_SYSTEM * 2)
 
 app = Flask(__name__)
 
