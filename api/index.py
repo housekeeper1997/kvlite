@@ -4,7 +4,7 @@ from flask import Flask, request, render_template, url_for
 from api import data as db, timepoint
 from time import time
 from datetime import datetime
-from api.utility import env_float, env_int, env_str, failed, strExceedLimit, succeed
+from api.utility import env_float, env_int, env_str, failed, strExceedLimit, succeed, sha256
 
 # DB_NAME = env_str('DB_NAME','KVData.db')
 DB_NAME = env_str('DB_NAME','sqlite:///KVData.db')
@@ -16,6 +16,7 @@ MINIMUM_SET_INTERVAL_PER_USER = env_int('MINIMUM_SET_INTERVAL_PER_USER', 60)    
 MINIMUM_SET_INTERVAL_SYSTEM = env_int('MINIMUM_SET_INTERVAL_SYSTEM', 1)         # seconds
 PER_PAGE_DEFAULT = env_int('PER_PAGE_DEFAULT', 10)      # Rows per page
 PAGE_DEFAULT = env_int('PAGE_DEFAULT', 1)               # Page number
+MINGLE_SALT = env_str('MINGLE_SALT', DB_NAME)
 
 KKEY = 'key'
 VKEY = 'value'
@@ -29,10 +30,13 @@ DbEngine = None
 
 def get_engine():
     global DbEngine
+    print(DB_NAME)
     if DbEngine is None:
         DbEngine = db.connect_db(DB_NAME)
     return DbEngine
 
+def mingle_key(key):
+    return sha256(f'{key}{MINGLE_SALT}')
 
 @app.route('/')
 def hello():
@@ -51,6 +55,7 @@ def get_data():
 @app.route('/kv/<key>')
 def get_kv(key):
     # print(f"got request for key: {key}")
+    key = mingle_key(key)
     row = db.select(get_engine(), key)
     if row is None:
         return failed( 'data not exist')
@@ -68,20 +73,21 @@ def set_kv():
         return failed(f'key length exceed {KEY_LENGTH_LIMIT} bytes')
     if strExceedLimit(kv[VKEY], VALUE_LENGTH_LIMIT):
         return failed(f'data length exceed limit: {VALUE_LENGTH_LIMIT} bytes')
-    oldVal = db.select(get_engine(),kv[KKEY])
+    key = mingle_key(kv[KKEY])
+    oldVal = db.select(get_engine(),key)
     # print(oldVal)
     if oldVal is not None:
         userLastWriteTime = timepoint.timepoint(float(oldVal[2]))
         if userLastWriteTime.elapsed() < MINIMUM_SET_INTERVAL_PER_USER:
             return failed('wait one minute')
-        db.update(get_engine(), kv[KKEY], kv[VKEY], str(time()))
+        db.update(get_engine(), key, kv[VKEY], str(time()))
         LastWriteTime.set()
         return succeed('updated')
     if db.rowCount(get_engine()) > ROW_COUNT_LIMIT:
         print(f"table row count reach limit: {ROW_COUNT_LIMIT}")
         return failed('can not create more rows')
     LastWriteTime.set()
-    db.insert(get_engine(), kv[KKEY], kv[VKEY], str(time()))
+    db.insert(get_engine(), key, kv[VKEY], str(time()))
     return succeed('created')
 
 if __name__ == "__main__":

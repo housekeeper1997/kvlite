@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import os
+import hashlib
 
 def succeed(desc:str):
     return op_result('succeed', desc)
@@ -30,3 +31,6 @@ def env_int(key: str, defaultValue: int):
 
 def env_float(key: str, defaultValue: float):
     return env_type(key, defaultValue, float)
+
+def sha256(text: str):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
