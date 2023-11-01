@@ -26,7 +26,7 @@ class Kv(Base):
 
 def connect_db(dbname, clean=False):
     # conn = sqlite3.connect(dbname)
-    engine = db.create_engine(dbname, echo=False)
+    engine = db.create_engine(dbname, echo=False, pool_pre_ping=True)
     with engine.connect() as conn:
         if clean:
             qdrop = f'DROP TABLE IF EXISTS {KVTABLE_NAME};'
